@@ -1,6 +1,7 @@
 seed:
   seed: 42
   deterministic: true
+  deterministic_warn_only: true
 
 device:
   prefer: auto  # auto|cpu|cuda|mps

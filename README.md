@@ -17,7 +17,7 @@ End-to-end **scene text word recognition**: given a cropped word image, predict 
 - **SVT** (eval): `https://www.iapr-tc11.org/mediawiki/index.php/The_Street_View_Text_Dataset`
 
 ## Repo layout
-See the requested structure under `ocr-crnn-ctc/`:
+Key folders/files:
 - `scripts/` for dataset preparation
 - `data/raw/` and `data/processed/` are **git-ignored**
 - `train.py`, `eval.py`, `infer.py`, `demo_app.py`
@@ -26,7 +26,7 @@ See the requested structure under `ocr-crnn-ctc/`:
 Create and activate a virtual environment:
 
 ```bash
-cd /Users/deepakm/Documents/Deep_learning/RNN/ocr-crnn-ctc
+cd /Users/deepakm/Documents/Deep_learning/RNN
 # Recommended on macOS: use Python 3.11/3.12 (PyTorch wheels typically don’t support 3.13 yet).
 # Example (Homebrew): brew install python@3.12
 python3.12 -m venv .venv  # or: python3 -m venv .venv (if your python3 is 3.11/3.12)
@@ -88,6 +88,19 @@ streamlit run demo_app.py
 ## Metrics
 - **CER**: Levenshtein distance / max(1, len(gt))
 - **Word accuracy**: exact-match ratio
+
+## Results (current)
+All results below are **unconstrained** (no lexicon/LM), using the checkpoint selected by **best validation CER**:
+- **checkpoint**: `checkpoints/best_by_cer.pt`
+- **MJSynth subset**: train=190,000 / val=10,000 (sampled from HF mirror)
+- **best epoch (by val CER)**: epoch 11 (val CER 0.0872, val word acc 0.6665)
+
+| Dataset | Split | Decoder | CER ↓ | Word Acc ↑ |
+|---|---|---|---:|---:|
+| MJSynth (subset) | val | greedy | 0.0872 | 0.6665 |
+| MJSynth (subset) | val | beam | 0.0981 | 0.6184 |
+| IIIT-5K | test | greedy | 0.1971 | 0.4977 |
+| IIIT-5K | test | beam | 0.2284 | 0.4223 |
 
 ## Notes / next upgrades
 - Add augmentation (blur, perspective, noise) and stronger CNN backbones

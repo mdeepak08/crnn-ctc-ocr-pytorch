@@ -12,6 +12,7 @@ import torch
 class SeedConfig:
     seed: int = 42
     deterministic: bool = True
+    deterministic_warn_only: bool = True
 
 
 def seed_everything(cfg: SeedConfig) -> None:
@@ -30,9 +31,10 @@ def seed_everything(cfg: SeedConfig) -> None:
     if cfg.deterministic:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-        # If a nondeterministic op is used, this will error (good for reproducibility).
+        # Some GPU ops (e.g., CTC backward) may not have deterministic implementations.
+        # Using warn_only=True keeps best-effort determinism without hard-failing training.
         try:
-            torch.use_deterministic_algorithms(True)
+            torch.use_deterministic_algorithms(True, warn_only=cfg.deterministic_warn_only)
         except Exception:
             # Older torch versions may not support this fully.
             pass
