@@ -1,8 +1,0 @@
-{
-  "cer": 1.0,
-  "word_acc": 0.0,
-  "decoder": "greedy",
-  "num_samples": 40,
-  "dataset_csv": "samples/toy/val.csv",
-  "ckpt": "checkpoints/best_by_cer.pt"
-}

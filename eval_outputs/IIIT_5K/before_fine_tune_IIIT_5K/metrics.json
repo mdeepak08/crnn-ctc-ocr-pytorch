@@ -1,0 +1,18 @@
+[
+  {
+    "cer": 0.2284367018141332,
+    "word_acc": 0.42233333333333334,
+    "decoder": "beam",
+    "num_samples": 3000,
+    "dataset_csv": "data/processed/iiit5k_test.csv",
+    "ckpt": "checkpoints/best_by_cer.pt"
+  },
+  {
+    "cer": 0.19706595061890103,
+    "word_acc": 0.49766666666666665,
+    "decoder": "greedy",
+    "num_samples": 3000,
+    "dataset_csv": "data/processed/iiit5k_test.csv",
+    "ckpt": "checkpoints/best_by_cer.pt"
+  }
+]

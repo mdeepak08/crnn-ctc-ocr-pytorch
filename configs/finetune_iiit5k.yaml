@@ -5,10 +5,15 @@ datasets:
   val_csv: data/processed/iiit5k_test.csv
 
 train:
-  epochs: 10
+  # NOTE: When using `--resume checkpoints/best_by_cer.pt`, your checkpoint may already be at a higher epoch.
+  # `train.py` interprets `train.epochs` as the *total* max epoch index, so it must be > resumed start_epoch.
+  epochs: 25
   batch_size: 64
   lr: 0.0002
   early_stop_patience: 3
-  decoder_for_val: beam
+  # IMPORTANT: This checkpoint's best CER came from MJSynth val; reset it so IIIT-5K can define its own "best".
+  reset_best_on_resume: true
+  # Beam search without a language model can be worse than greedy for CTC; use greedy for model selection.
+  decoder_for_val: greedy
   beam_width: 5
 

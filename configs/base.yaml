@@ -37,6 +37,13 @@ train:
   log_dir: logs/tensorboard
   ckpt_dir: checkpoints
   early_stop_patience: 10
+  # When resuming from a checkpoint, `best_metric` is used for:
+  # - early stopping
+  # - deciding when to overwrite `best_by_cer.pt`
+  #
+  # For fine-tuning on a *new* dataset, you typically want to reset this so
+  # the new run can establish its own "best" metric on the new val set.
+  reset_best_on_resume: false
   decoder_for_val: greedy  # greedy|beam
   beam_width: 5
 

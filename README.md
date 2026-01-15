@@ -90,10 +90,14 @@ streamlit run demo_app.py
 - **Word accuracy**: exact-match ratio
 
 ## Results (current)
-All results below are **unconstrained** (no lexicon/LM), using the checkpoint selected by **best validation CER**:
-- **checkpoint**: `checkpoints/best_by_cer.pt`
+All results below are **unconstrained** (no lexicon/LM).
+
+Important note on checkpoints:
+- `checkpoints/best_by_cer.pt` can be **overwritten** between runs (e.g., pretrain vs fine-tune). If you want to keep both, copy/rename it after each run.
+
+### Pretrain on MJSynth (subset)
 - **MJSynth subset**: train=190,000 / val=10,000 (sampled from HF mirror)
-- **best epoch (by val CER)**: epoch 11 (val CER 0.0872, val word acc 0.6665)
+- **best epoch (by MJSynth val CER)**: epoch 11 (val CER 0.0872, val word acc 0.6665)
 
 | Dataset | Split | Decoder | CER ↓ | Word Acc ↑ |
 |---|---|---|---:|---:|
@@ -101,6 +105,18 @@ All results below are **unconstrained** (no lexicon/LM), using the checkpoint se
 | MJSynth (subset) | val | beam | 0.0981 | 0.6184 |
 | IIIT-5K | test | greedy | 0.1971 | 0.4977 |
 | IIIT-5K | test | beam | 0.2284 | 0.4223 |
+| SVT | test | greedy | 0.1791 | 0.5100 |
+| SVT | test | beam | 0.1963 | 0.4760 |
+
+### After fine-tuning on IIIT-5K
+Evaluated after fine-tuning on IIIT-5K (starting from the MJSynth-pretrained checkpoint):
+
+| Dataset | Split | Decoder | CER ↓ | Word Acc ↑ |
+|---|---|---|---:|---:|
+| IIIT-5K | test | greedy | 0.1082 | 0.7360 |
+| IIIT-5K | test | beam | 0.1095 | 0.7323 |
+| SVT | test | greedy | 0.1607 | 0.6182 |
+| SVT | test | beam | 0.1612 | 0.6167 |
 
 ## Notes / next upgrades
 - Add augmentation (blur, perspective, noise) and stronger CNN backbones

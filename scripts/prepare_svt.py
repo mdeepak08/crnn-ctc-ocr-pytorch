@@ -60,12 +60,26 @@ def main() -> None:
 
     rows: list[tuple[str, str]] = []
     n_skipped = 0
+    n_images = 0
+    n_rects_seen = 0
 
-    # SVT XML commonly has structure:
-    # <image file="img/xxx.jpg"> <taggedRect x= y= width= height=> <tag>WORD</tag> ...
+    # SVT XML has (at least) two common formats:
+    # 1) Official-ish:
+    #    <image> <imageName>img/14_03.jpg</imageName> ... <taggedRectangles>
+    #         <taggedRectangle x= y= width= height=> <tag>WORD</tag> ...
+    # 2) Some converted mirrors:
+    #    <image file="img/xxx.jpg"> <taggedRect x= y= width= height=> <tag>WORD</tag> ...
     for img_el in root.iter("image"):
+        n_images += 1
+
+        # image path can be an attribute or a child element <imageName>
         file_attr = img_el.attrib.get("file", "") or img_el.attrib.get("name", "")
         if not file_attr:
+            name_el = img_el.find("imageName")
+            if name_el is not None and name_el.text:
+                file_attr = name_el.text.strip()
+        if not file_attr:
+            n_skipped += 1
             continue
 
         full_img_path = (raw_root / file_attr).resolve()
@@ -83,11 +97,26 @@ def main() -> None:
             n_skipped += 1
             continue
 
-        for rect in img_el.iter("taggedRect"):
-            tag_el = rect.find("tag")
-            if tag_el is None or tag_el.text is None:
-                continue
-            text = tag_el.text.strip()
+        # Rect element names vary: taggedRectangle (official) vs taggedRect (converted)
+        rect_iters = list(img_el.iter("taggedRectangle"))
+        if not rect_iters:
+            rect_iters = list(img_el.iter("taggedRect"))
+
+        def _get_tag_text(rect_el: ET.Element) -> str:
+            # ElementTree Elements are "falsey" when they have no children (len==0),
+            # so DO NOT use `a or b` with Elements here.
+            tag = rect_el.find("tag")
+            if tag is None:
+                tag = rect_el.find("Tag")
+            if tag is not None and tag.text:
+                return tag.text.strip()
+            # Some converted formats store the transcription as an attribute
+            return str(rect_el.attrib.get("tag", "")).strip()
+
+        for rect in rect_iters:
+            n_rects_seen += 1
+
+            text = _get_tag_text(rect)
             if args.lowercase:
                 text = text.lower()
 
@@ -129,6 +158,12 @@ def main() -> None:
 
     write_csv(rows, out_dir / "svt.csv")
     print(f"Prepared SVT crops: n={len(rows)} skipped={n_skipped}")
+    if len(rows) == 0:
+        print(
+            f"NOTE: Produced 0 crops. Debug counts: images_seen={n_images} rects_seen={n_rects_seen}. "
+            "This usually means the XML tag names/structure differ from what the parser expects, "
+            "or all tags were filtered by --allowed/--max_len."
+        )
     print(f"Wrote crops to: {crops_dir}")
     print(f"Wrote CSV to: {out_dir / 'svt.csv'}")
 

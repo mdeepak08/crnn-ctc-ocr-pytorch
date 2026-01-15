@@ -185,6 +185,7 @@ def main() -> None:
     start_epoch = 0
     global_step = 0
     best_cer = float("inf")
+    resumed_best_cer: float | None = None
 
     if args.resume:
         state = torch.load(args.resume, map_location="cpu")
@@ -196,6 +197,7 @@ def main() -> None:
         start_epoch = int(state.get("epoch", 0)) + 1
         global_step = int(state.get("step", 0))
         best_cer = float(state.get("best_metric", best_cer))
+        resumed_best_cer = best_cer
         print_once(f"Resumed from {args.resume} @ epoch={start_epoch} step={global_step} best_cer={best_cer:.4f}")
 
     use_amp = bool(cfg["train"]["amp"]) and supports_amp(device)
@@ -204,10 +206,30 @@ def main() -> None:
     patience = int(cfg["train"]["early_stop_patience"])
     patience_left = patience
 
+    # If we're fine-tuning on a new dataset, we want early stopping + best ckpt
+    # selection to be based on the *new* validation set, not the previous run.
+    if bool(cfg["train"].get("reset_best_on_resume", False)) and args.resume:
+        best_cer = float("inf")
+        patience_left = patience
+        if resumed_best_cer is not None:
+            print_once(
+                f"Resetting best CER on resume (was {resumed_best_cer:.4f}) so this run can define a new best on its val set."
+            )
+
     decoder_for_val = str(cfg["train"]["decoder_for_val"])
     beam_width = int(cfg["train"].get("beam_width", 5))
 
-    for epoch in range(start_epoch, int(cfg["train"]["epochs"])):
+    max_epochs = int(cfg["train"]["epochs"])
+    if start_epoch >= max_epochs:
+        print_once(
+            "Nothing to train: resumed start_epoch "
+            f"({start_epoch}) >= config train.epochs ({max_epochs}). "
+            "Either increase train.epochs in your config or run without --resume."
+        )
+        logger.close()
+        return
+
+    for epoch in range(start_epoch, max_epochs):
         model.train()
         pbar = tqdm(train_loader, desc=f"train epoch {epoch}", leave=False)
         running_loss = 0.0
