@@ -1,0 +1,14 @@
+base: configs/base.yaml
+
+datasets:
+  train_csv: data/processed/iiit5k_train.csv
+  val_csv: data/processed/iiit5k_test.csv
+
+train:
+  epochs: 10
+  batch_size: 64
+  lr: 0.0002
+  early_stop_patience: 3
+  decoder_for_val: beam
+  beam_width: 5
+

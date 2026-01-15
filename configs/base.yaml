@@ -1,0 +1,47 @@
+seed:
+  seed: 42
+  deterministic: true
+
+device:
+  prefer: auto  # auto|cpu|cuda|mps
+
+vocab:
+  path: data/processed/vocab.json
+  blank_idx: 0
+
+data:
+  img_h: 32
+  img_w: 128
+  max_len: 25
+  lowercase: true
+  strict_vocab: true
+
+model:
+  img_h: 32
+  num_channels: 1
+  cnn_out_channels: 256
+  rnn_hidden: 256
+  rnn_layers: 2
+  rnn_type: lstm
+  dropout: 0.1
+
+train:
+  epochs: 5
+  batch_size: 64
+  num_workers: 2
+  lr: 0.0005
+  weight_decay: 0.01
+  grad_clip: 5.0
+  amp: true
+  log_dir: logs/tensorboard
+  ckpt_dir: checkpoints
+  early_stop_patience: 10
+  decoder_for_val: greedy  # greedy|beam
+  beam_width: 5
+
+eval:
+  batch_size: 64
+  num_workers: 2
+  decoder: greedy  # greedy|beam
+  beam_width: 5
+

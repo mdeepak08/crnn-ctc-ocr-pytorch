@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.Python
+.venv/
+.env
+.mypy_cache/
+.pytest_cache/
+
+# OS
+.DS_Store
+
+# Data (ignored)
+data/raw/
+data/processed/
+
+# Training artifacts (ignored)
+checkpoints/
+logs/
+runs/
+
+# Streamlit
+.streamlit/
+

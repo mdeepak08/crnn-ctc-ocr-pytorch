@@ -1,0 +1,29 @@
+base: configs/base.yaml
+
+device:
+  prefer: cpu  # MPS doesn't implement CTC loss yet; CPU is fine for toy sanity.
+
+vocab:
+  path: samples/toy/vocab.json
+
+data:
+  img_h: 32
+  img_w: 128
+  max_len: 12
+  lowercase: false
+
+datasets:
+  train_csv: samples/toy/train.csv
+  val_csv: samples/toy/val.csv
+
+train:
+  epochs: 3
+  batch_size: 32
+  num_workers: 0
+  lr: 0.001
+  early_stop_patience: 10
+  decoder_for_val: greedy
+
+eval:
+  num_workers: 0
+

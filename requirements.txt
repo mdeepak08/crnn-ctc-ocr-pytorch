@@ -1,0 +1,23 @@
+# Core
+torch>=2.2
+torchvision>=0.17
+numpy>=1.24
+pyyaml>=6.0
+tqdm>=4.66
+
+# Images
+pillow>=10.0
+opencv-python>=4.8
+
+# Metrics
+rapidfuzz>=3.6
+
+# Dataset parsing (IIIT-5K .mat)
+scipy>=1.10
+
+# Logging
+tensorboard>=2.16
+
+# Demo
+streamlit>=1.31
+

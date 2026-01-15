@@ -1,0 +1,14 @@
+base: configs/base.yaml
+
+datasets:
+  train_csv: data/processed/mjsynth_train.csv
+  val_csv: data/processed/mjsynth_val.csv
+
+train:
+  epochs: 20
+  batch_size: 128
+  num_workers: 4
+  lr: 0.0005
+  early_stop_patience: 5
+  decoder_for_val: greedy
+
