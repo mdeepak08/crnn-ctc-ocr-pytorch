@@ -17,6 +17,25 @@ data:
   lowercase: true
   strict_vocab: true
 
+# Train-time augmentations (real-world robustness). Off by default; enable per experiment config.
+augment:
+  enabled: false
+  perspective_p: 0.15
+  perspective_distortion: 0.25
+  affine_p: 0.35
+  affine_degrees: 2.0
+  affine_translate: 0.02
+  affine_scale_min: 0.9
+  affine_scale_max: 1.1
+  photometric_p: 0.35
+  brightness: 0.25
+  contrast: 0.25
+  blur_p: 0.15
+  blur_radius_max: 1.2
+  jpeg_p: 0.15
+  jpeg_quality_min: 30
+  jpeg_quality_max: 85
+
 model:
   img_h: 32
   num_channels: 1

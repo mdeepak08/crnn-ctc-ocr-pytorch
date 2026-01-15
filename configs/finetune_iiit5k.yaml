@@ -17,3 +17,22 @@ train:
   decoder_for_val: greedy
   beam_width: 5
 
+# Enable real-world augmentations during fine-tuning (val/test are kept clean).
+augment:
+  enabled: true
+  perspective_p: 0.20
+  perspective_distortion: 0.30
+  affine_p: 0.40
+  affine_degrees: 2.5
+  affine_translate: 0.03
+  affine_scale_min: 0.85
+  affine_scale_max: 1.15
+  photometric_p: 0.45
+  brightness: 0.30
+  contrast: 0.30
+  blur_p: 0.20
+  blur_radius_max: 1.4
+  jpeg_p: 0.20
+  jpeg_quality_min: 25
+  jpeg_quality_max: 85
+

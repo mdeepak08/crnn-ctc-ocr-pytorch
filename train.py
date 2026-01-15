@@ -33,6 +33,24 @@ from src.utils.seed import SeedConfig, seed_everything
 REPO_ROOT = Path(__file__).resolve().parent
 
 
+def _seed_worker(worker_id: int) -> None:
+    # Ensure numpy/random are deterministically seeded in each DataLoader worker.
+    # PyTorch sets a unique (but deterministic) base seed per worker; we mirror it.
+    worker_seed = torch.initial_seed() % (2**32)
+    try:
+        import numpy as np
+
+        np.random.seed(worker_seed)
+    except Exception:
+        pass
+    try:
+        import random
+
+        random.seed(worker_seed)
+    except Exception:
+        pass
+
+
 def _deep_merge(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     out = dict(a)
     for k, v in b.items():
@@ -107,10 +125,32 @@ def main() -> None:
     num_classes = len(idx2char)
 
     # Datasets
-    tcfg = OCRTransformConfig(
+    base_tcfg = dict(
         img_h=int(cfg["data"]["img_h"]),
         img_w=int(cfg["data"]["img_w"]),
     )
+    aug_cfg = cfg.get("augment", {}) if isinstance(cfg, dict) else {}
+    train_tcfg = OCRTransformConfig(
+        **base_tcfg,
+        augment_enabled=bool(aug_cfg.get("enabled", False)),
+        aug_perspective_p=float(aug_cfg.get("perspective_p", 0.15)),
+        aug_perspective_distortion=float(aug_cfg.get("perspective_distortion", 0.25)),
+        aug_affine_p=float(aug_cfg.get("affine_p", 0.35)),
+        aug_affine_degrees=float(aug_cfg.get("affine_degrees", 2.0)),
+        aug_affine_translate=float(aug_cfg.get("affine_translate", 0.02)),
+        aug_affine_scale_min=float(aug_cfg.get("affine_scale_min", 0.9)),
+        aug_affine_scale_max=float(aug_cfg.get("affine_scale_max", 1.1)),
+        aug_photometric_p=float(aug_cfg.get("photometric_p", 0.35)),
+        aug_brightness=float(aug_cfg.get("brightness", 0.25)),
+        aug_contrast=float(aug_cfg.get("contrast", 0.25)),
+        aug_blur_p=float(aug_cfg.get("blur_p", 0.15)),
+        aug_blur_radius_max=float(aug_cfg.get("blur_radius_max", 1.2)),
+        aug_jpeg_p=float(aug_cfg.get("jpeg_p", 0.15)),
+        aug_jpeg_quality_min=int(aug_cfg.get("jpeg_quality_min", 30)),
+        aug_jpeg_quality_max=int(aug_cfg.get("jpeg_quality_max", 85)),
+    )
+    val_tcfg = OCRTransformConfig(**base_tcfg, augment_enabled=False)
+
     train_ds = OCRCsvDataset(
         OCRCsvDatasetConfig(
             csv_path=str(REPO_ROOT / cfg["datasets"]["train_csv"]),
@@ -119,7 +159,7 @@ def main() -> None:
             lowercase=bool(cfg["data"]["lowercase"]),
             strict_vocab=bool(cfg["data"]["strict_vocab"]),
             image_base_dir=str(REPO_ROOT),
-            transform=tcfg,
+            transform=train_tcfg,
         )
     )
     val_ds = OCRCsvDataset(
@@ -130,7 +170,7 @@ def main() -> None:
             lowercase=bool(cfg["data"]["lowercase"]),
             strict_vocab=bool(cfg["data"]["strict_vocab"]),
             image_base_dir=str(REPO_ROOT),
-            transform=tcfg,
+            transform=val_tcfg,
         )
     )
 
@@ -159,6 +199,8 @@ def main() -> None:
     scheduler = CosineAnnealingLR(optimizer, T_max=max(1, int(cfg["train"]["epochs"]) * steps_per_epoch))
 
     collate_cfg = CollateConfig(cnn_downsample_factor=model.cnn_downsample_factor_w)
+    dl_generator = torch.Generator()
+    dl_generator.manual_seed(int(cfg["seed"]["seed"]))
     train_loader = DataLoader(
         train_ds,
         batch_size=int(cfg["train"]["batch_size"]),
@@ -166,6 +208,8 @@ def main() -> None:
         num_workers=int(cfg["train"]["num_workers"]),
         pin_memory=(device.type == "cuda"),
         collate_fn=partial(collate_ocr_batch, cfg=collate_cfg),
+        worker_init_fn=_seed_worker,
+        generator=dl_generator,
     )
     val_loader = DataLoader(
         val_ds,
@@ -174,6 +218,8 @@ def main() -> None:
         num_workers=int(cfg["train"]["num_workers"]),
         pin_memory=(device.type == "cuda"),
         collate_fn=partial(collate_ocr_batch, cfg=collate_cfg),
+        worker_init_fn=_seed_worker,
+        generator=dl_generator,
     )
 
     ckpt_dir = (REPO_ROOT / str(cfg["train"]["ckpt_dir"])).resolve()

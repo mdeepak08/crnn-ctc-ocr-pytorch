@@ -118,7 +118,16 @@ Evaluated after fine-tuning on IIIT-5K (starting from the MJSynth-pretrained che
 | SVT | test | greedy | 0.1607 | 0.6182 |
 | SVT | test | beam | 0.1612 | 0.6167 |
 
+### After IIIT-5K fine-tuning + augmentations
+Same fine-tuning setup, but with train-time augmentations enabled (`augment.enabled: true`) and evaluated with greedy decoding:
+
+| Dataset | Split | Decoder | CER ↓ | Word Acc ↑ |
+|---|---|---|---:|---:|
+| IIIT-5K | test | greedy | 0.0994 | 0.7577 |
+| SVT | test | greedy | 0.1396 | 0.6615 |
+
 ## Notes / next upgrades
+- To enable train-time augmentations, set `augment.enabled: true` in your config (validation/test are always run without augmentation).
 - Add augmentation (blur, perspective, noise) and stronger CNN backbones
 - Add an LM-aware decoding (beam + char/word LM)
 - Replace BiLSTM with a Transformer encoder
