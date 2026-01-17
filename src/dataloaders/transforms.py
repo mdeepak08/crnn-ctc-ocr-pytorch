@@ -98,9 +98,17 @@ class OCRPreprocess:
 
         # Perspective + affine BEFORE resize/pad (helps with real-world viewpoint + mild rotations)
         if torch.rand(1).item() < float(self.cfg.aug_perspective_p):
-            img_l = self._perspective(img_l)
+            # torchvision's RandomPerspective can rarely sample a degenerate transform
+            # that makes lstsq fail; skip augmentation in that case instead of crashing.
+            try:
+                img_l = self._perspective(img_l)
+            except Exception:
+                pass
         if torch.rand(1).item() < float(self.cfg.aug_affine_p):
-            img_l = self._affine(img_l)
+            try:
+                img_l = self._affine(img_l)
+            except Exception:
+                pass
         return img_l
 
     def _maybe_photometric_aug(self, img_l: Image.Image) -> Image.Image:

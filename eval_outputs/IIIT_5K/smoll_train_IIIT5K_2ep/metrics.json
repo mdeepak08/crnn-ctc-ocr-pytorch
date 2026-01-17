@@ -1,0 +1,8 @@
+{
+  "cer": 0.09208199620145392,
+  "word_acc": 0.768,
+  "decoder": "greedy",
+  "num_samples": 3000,
+  "dataset_csv": "data/processed/iiit5k_test.csv",
+  "ckpt": "checkpoints/best_by_cer.pt"
+}

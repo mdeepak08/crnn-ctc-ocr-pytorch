@@ -118,13 +118,29 @@ Evaluated after fine-tuning on IIIT-5K (starting from the MJSynth-pretrained che
 | SVT | test | greedy | 0.1607 | 0.6182 |
 | SVT | test | beam | 0.1612 | 0.6167 |
 
-### After IIIT-5K fine-tuning + augmentations
-Same fine-tuning setup, but with train-time augmentations enabled (`augment.enabled: true`) and evaluated with greedy decoding:
+### After fine-tuning on IIIT-5K + train-time augmentations
+Greedy decoding only (augmentation was enabled during training; evaluation is clean/no-aug):
 
 | Dataset | Split | Decoder | CER ↓ | Word Acc ↑ |
 |---|---|---|---:|---:|
 | IIIT-5K | test | greedy | 0.0994 | 0.7577 |
 | SVT | test | greedy | 0.1396 | 0.6615 |
+
+### After training on mixed MJSynth + IIIT-5K (with augmentations)
+Greedy decoding only:
+
+| Dataset | Split | Decoder | CER ↓ | Word Acc ↑ |
+|---|---|---|---:|---:|
+| IIIT-5K | test | greedy | 0.0976 | 0.7447 |
+| SVT | test | greedy | 0.1225 | 0.7002 |
+
+### After mixed training + short IIIT-only fine-tune (2 epochs)
+Greedy decoding only:
+
+| Dataset | Split | Decoder | CER ↓ | Word Acc ↑ |
+|---|---|---|---:|---:|
+| IIIT-5K | test | greedy | 0.0921 | 0.7680 |
+| SVT | test | greedy | 0.1307 | 0.6878 |
 
 ## Notes / next upgrades
 - To enable train-time augmentations, set `augment.enabled: true` in your config (validation/test are always run without augmentation).
