@@ -89,6 +89,90 @@ streamlit run demo_app.py
 - **CER**: Levenshtein distance / max(1, len(gt))
 - **Word accuracy**: exact-match ratio
 
+## Current architecture explained with example
+Think of one example cropped word image: **"cafe"**.
+
+### What are B, C, H, W, F, T?
+- **B**: batch size (number of images processed together). Example: batch_size=64 → **B=64**. For a single image → **B=1**.
+- **C**: channels.
+  - Input is grayscale → **C=1**
+  - After CNN, channels become learned feature channels (e.g., **64/128/256**).
+- **H, W**: height/width in pixels of the preprocessed image (commonly **H=32**, **W=128** due to resize + padding).
+- **T**: number of time steps after CNN (roughly the **CNN output width** \(W'\)). It’s like “how many vertical slices the model sees” left→right.
+- **F**: feature size per time step (how many numbers describe one slice). Often **F ≈ cnn_out_channels** (e.g., **256**).
+
+### 1) CNN: image → feature map
+Input (one image):
+- Shape: **[B, 1, 32, 128]** → **[1, 1, 32, 128]**
+
+After CNN (typical example):
+- Shape: **[B, C_feat, H', W']** → **[1, 256, 1, 32]**
+  - Width **128** gets downsampled by ~4 → **32** columns (time steps).
+
+**What are those 256 numbers?**  
+At each column position along the word, the CNN outputs a **256-dim vector** describing visual patterns it learned (strokes/curves/background boundaries, etc.). So the word becomes a **strip of feature vectors across width**.
+
+### 2) Make it a sequence: feature map → [T, B, F]
+We treat the CNN output width \(W'\) as time:
+- From **[1, 256, 1, 32]** → squeeze \(H'\) and rearrange → **[T, B, F] = [32, 1, 256]**
+
+So for "cafe", the model now has **32 feature vectors**, each representing a left→right “slice” of the word.
+
+### 3) BiLSTM: add context across the slices
+Each time step has a feature vector \(x_t \in \mathbb{R}^{256}\).
+
+A **BiLSTM** reads this sequence in both directions:
+- **Forward LSTM** (left → right): builds a hidden state \(h^{→}_t\) summarizing what came before.
+- **Backward LSTM** (right → left): builds \(h^{←}_t\) summarizing what comes after.
+- They’re concatenated: \(h_t = [h^{→}_t;\,h^{←}_t]\) so the output size becomes **2H** (example: hidden=256 → output features per step = 512).
+
+**What “context” does it learn?**  
+It helps resolve ambiguous local shapes by looking at neighbors:
+- The middle of **"m"** can resemble **"rn"** in blurry text; neighbors help disambiguate.
+- **"i" vs "l" vs "1"** depends on surrounding strokes and spacing.
+- Slices between characters are mostly background; context helps treat them as “blank-like”.
+
+### 4) Linear + log-softmax: per-time-step character probabilities
+For each time step \(t\), the model outputs a distribution over:
+- vocabulary characters (a–z, 0–9, etc.)
+- plus the **CTC blank** (index 0)
+
+So `log_probs` has shape:
+- **[T, B, num_classes]**
+- Example: **[32, 1, 37]** (36 chars + blank)
+
+### CTC explained again (with greedy + beam)
+**CTC = Connectionist Temporal Classification**.
+
+CTC is the trick that lets the model output **T predictions** (like 32) even though the true word has fewer characters (like 4), **without** telling it exactly which time step aligns to which character.
+
+CTC introduces a special **blank** token `_` and defines decoding as:
+1) **collapse repeats** (only consecutive repeats)
+2) **remove blanks**
+
+#### Greedy decoding example
+Pick the argmax class at each time step, then apply the CTC rules.
+
+Raw per-step argmax (shortened):
+`_ _ c c _ a a _ f _ e e _ _`
+
+1) Collapse repeats:
+`_ c _ a _ f _ e _`
+
+2) Remove blanks:
+`cafe`
+
+Greedy can fail if the model makes one locally-wrong argmax that ruins the whole word.
+
+#### Beam decoding example (why it can help)
+Beam search keeps the top **K** most probable partial strings as it scans time steps.
+
+If the model is uncertain at one step (e.g., between `e` and `c`):
+- Greedy commits immediately (might pick the wrong one).
+- Beam keeps multiple hypotheses alive (example: `"caf"` and `"cac"`) and later evidence can make `"cafe"` win.
+
+Note: A proper CTC beam search tracks blank/non-blank endings because repeats behave differently; our code uses a prefix beam search.
+
 ## Results (current)
 All results below are **unconstrained** (no lexicon/LM).
 

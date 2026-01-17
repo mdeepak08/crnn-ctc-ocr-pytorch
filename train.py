@@ -184,6 +184,8 @@ def main() -> None:
         rnn_layers=int(cfg["model"]["rnn_layers"]),
         rnn_type=str(cfg["model"]["rnn_type"]),
         dropout=float(cfg["model"]["dropout"]),
+        stn_enabled=bool(cfg["model"].get("stn_enabled", False)),
+        stn_localization_channels=int(cfg["model"].get("stn_localization_channels", 32)),
     )
     model = CRNN(mcfg).to(device)
 

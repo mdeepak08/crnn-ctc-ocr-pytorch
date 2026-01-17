@@ -44,6 +44,9 @@ model:
   rnn_layers: 2
   rnn_type: lstm
   dropout: 0.1
+  # Option A: rectifier before CNN (affine STN). Off by default.
+  stn_enabled: false
+  stn_localization_channels: 32
 
 train:
   epochs: 5
