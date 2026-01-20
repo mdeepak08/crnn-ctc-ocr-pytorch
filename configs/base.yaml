@@ -38,6 +38,7 @@ augment:
 
 model:
   img_h: 32
+  img_w: 128
   num_channels: 1
   cnn_out_channels: 256
   rnn_hidden: 256
@@ -45,8 +46,14 @@ model:
   rnn_type: lstm
   dropout: 0.1
   # Option A: rectifier before CNN (affine STN). Off by default.
-  stn_enabled: false
+  stn_enabled: true
   stn_localization_channels: 32
+  # Option A: TPS rectifier (stronger than affine STN). If enabled, TPS is used.
+  tps_enabled: true
+  tps_num_fiducial: 20
+  tps_margin_x: 0.05
+  tps_margin_y: 0.05
+  tps_localization_channels: 32
 
 train:
   epochs: 5
@@ -54,6 +61,9 @@ train:
   num_workers: 2
   lr: 0.0005
   weight_decay: 0.01
+  # Optional: use a smaller LR for the rectifier (STN/TPS) for stability.
+  # Example: 0.1 means rectifier lr = base_lr * 0.1
+  rectifier_lr_mult: 0.1
   grad_clip: 5.0
   amp: true
   log_dir: logs/tensorboard

@@ -6,10 +6,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .tps import TPSConfig, TPSRectifier
+
 
 @dataclass(frozen=True)
 class CRNNConfig:
     img_h: int = 32
+    img_w: int = 128
     num_channels: int = 1
     num_classes: int = 38  # includes blank at 0
     cnn_out_channels: int = 256
@@ -21,6 +24,13 @@ class CRNNConfig:
     # NOTE: TPS is stronger but more complex; affine STN is a solid first rectifier.
     stn_enabled: bool = False
     stn_localization_channels: int = 32
+    # Option A (rectifier): TPS (Thin Plate Spline) rectifier before the CNN.
+    # If enabled, TPS is used (and affine STN is ignored).
+    tps_enabled: bool = False
+    tps_num_fiducial: int = 20
+    tps_margin_x: float = 0.05
+    tps_margin_y: float = 0.05
+    tps_localization_channels: int = 32
 
 
 class _STNRectifier(nn.Module):
@@ -89,7 +99,20 @@ class CRNN(nn.Module):
             raise ValueError("CRNN currently expects img_h=32 for the default CNN stack.")
 
         self.stn: nn.Module | None = None
-        if bool(cfg.stn_enabled):
+        self.tps: nn.Module | None = None
+        if bool(cfg.tps_enabled):
+            self.tps = TPSRectifier(
+                in_channels=cfg.num_channels,
+                img_h=cfg.img_h,
+                img_w=cfg.img_w,
+                cfg=TPSConfig(
+                    num_fiducial=int(cfg.tps_num_fiducial),
+                    margin_x=float(cfg.tps_margin_x),
+                    margin_y=float(cfg.tps_margin_y),
+                    loc_channels=int(cfg.tps_localization_channels),
+                ),
+            )
+        elif bool(cfg.stn_enabled):
             self.stn = _STNRectifier(cfg.num_channels, int(cfg.stn_localization_channels))
 
         self.cnn = nn.Sequential(
@@ -135,10 +158,19 @@ class CRNN(nn.Module):
 
         self.proj = nn.Linear(rnn_out * 2, cfg.num_classes)
 
+    def rectifier_parameters(self):
+        if self.tps is not None:
+            return self.tps.parameters()
+        if self.stn is not None:
+            return self.stn.parameters()
+        return []
+
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         # images: [B,1,32,W]
-        if self.stn is not None:
-            images = self.stn(images)  # [B,1,32,W] rectified
+        if self.tps is not None:
+            images = self.tps(images)  # [B,1,32,W]
+        elif self.stn is not None:
+            images = self.stn(images)  # [B,1,32,W]
         feats = self.cnn(images)  # [B,C,1,W']
         feats = feats.squeeze(2)  # [B,C,W']
         feats = feats.permute(2, 0, 1).contiguous()  # [T=W',B,C]

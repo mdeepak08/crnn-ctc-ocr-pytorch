@@ -99,6 +99,7 @@ def main() -> None:
 
     mcfg = CRNNConfig(
         img_h=int(cfg["model"]["img_h"]),
+        img_w=int(cfg["model"].get("img_w", cfg["data"]["img_w"])),
         num_channels=int(cfg["model"]["num_channels"]),
         num_classes=num_classes,
         cnn_out_channels=int(cfg["model"]["cnn_out_channels"]),
@@ -106,6 +107,13 @@ def main() -> None:
         rnn_layers=int(cfg["model"]["rnn_layers"]),
         rnn_type=str(cfg["model"]["rnn_type"]),
         dropout=float(cfg["model"]["dropout"]),
+        stn_enabled=bool(cfg["model"].get("stn_enabled", False)),
+        stn_localization_channels=int(cfg["model"].get("stn_localization_channels", 32)),
+        tps_enabled=bool(cfg["model"].get("tps_enabled", False)),
+        tps_num_fiducial=int(cfg["model"].get("tps_num_fiducial", 20)),
+        tps_margin_x=float(cfg["model"].get("tps_margin_x", 0.05)),
+        tps_margin_y=float(cfg["model"].get("tps_margin_y", 0.05)),
+        tps_localization_channels=int(cfg["model"].get("tps_localization_channels", 32)),
     )
     model = CRNN(mcfg).to(device)
 

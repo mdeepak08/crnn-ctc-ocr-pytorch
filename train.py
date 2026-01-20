@@ -177,6 +177,7 @@ def main() -> None:
     # Model
     mcfg = CRNNConfig(
         img_h=int(cfg["model"]["img_h"]),
+        img_w=int(cfg["model"].get("img_w", cfg["data"]["img_w"])),
         num_channels=int(cfg["model"]["num_channels"]),
         num_classes=num_classes,
         cnn_out_channels=int(cfg["model"]["cnn_out_channels"]),
@@ -186,16 +187,35 @@ def main() -> None:
         dropout=float(cfg["model"]["dropout"]),
         stn_enabled=bool(cfg["model"].get("stn_enabled", False)),
         stn_localization_channels=int(cfg["model"].get("stn_localization_channels", 32)),
+        tps_enabled=bool(cfg["model"].get("tps_enabled", False)),
+        tps_num_fiducial=int(cfg["model"].get("tps_num_fiducial", 20)),
+        tps_margin_x=float(cfg["model"].get("tps_margin_x", 0.05)),
+        tps_margin_y=float(cfg["model"].get("tps_margin_y", 0.05)),
+        tps_localization_channels=int(cfg["model"].get("tps_localization_channels", 32)),
     )
     model = CRNN(mcfg).to(device)
 
     # Loss/opt
     criterion = CTCLoss(CTCLossConfig(blank_idx=blank_idx, zero_infinity=True))
-    optimizer = AdamW(
-        model.parameters(),
-        lr=float(cfg["train"]["lr"]),
-        weight_decay=float(cfg["train"]["weight_decay"]),
-    )
+    base_lr = float(cfg["train"]["lr"])
+    rect_lr_mult = float(cfg["train"].get("rectifier_lr_mult", 1.0))
+    rect_params = list(model.rectifier_parameters())
+    rect_ids = {id(p) for p in rect_params}
+    base_params = [p for p in model.parameters() if id(p) not in rect_ids]
+    if rect_params and rect_lr_mult != 1.0:
+        optimizer = AdamW(
+            [
+                {"params": base_params, "lr": base_lr},
+                {"params": rect_params, "lr": base_lr * rect_lr_mult},
+            ],
+            weight_decay=float(cfg["train"]["weight_decay"]),
+        )
+    else:
+        optimizer = AdamW(
+            model.parameters(),
+            lr=base_lr,
+            weight_decay=float(cfg["train"]["weight_decay"]),
+        )
 
     steps_per_epoch = math.ceil(len(train_ds) / int(cfg["train"]["batch_size"]))
     scheduler = CosineAnnealingLR(optimizer, T_max=max(1, int(cfg["train"]["epochs"]) * steps_per_epoch))

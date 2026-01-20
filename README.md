@@ -218,6 +218,22 @@ Greedy decoding only:
 | IIIT-5K | test | greedy | 0.0976 | 0.7447 |
 | SVT | test | greedy | 0.1225 | 0.7002 |
 
+### After adding rectifier (affine STN) + mixed training
+Greedy decoding only:
+
+| Dataset | Split | Decoder | CER ↓ | Word Acc ↑ |
+|---|---|---|---:|---:|
+| IIIT-5K | test | greedy | 0.0942 | 0.7547 |
+| SVT | test | greedy | 0.1185 | 0.7110 |
+
+### After adding TPS rectifier + mixed training
+Greedy decoding only:
+
+| Dataset | Split | Decoder | CER ↓ | Word Acc ↑ |
+|---|---|---|---:|---:|
+| IIIT-5K | test | greedy | 0.0922 | 0.7483 |
+| SVT | test | greedy | 0.1017 | 0.7357 |
+
 ### After mixed training + short IIIT-only fine-tune (2 epochs)
 Greedy decoding only:
 
