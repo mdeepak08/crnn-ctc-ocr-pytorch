@@ -1,0 +1,19 @@
+base: configs/finetune_iiit5k.yaml
+
+# Same data as your current best TPS run:
+# - Train: mixed MJSynth + IIIT-5K train
+# - Val:   IIIT-5K test (for early stopping + checkpoint selection)
+#
+# NOTE: You cannot --resume an old checkpoint when switching CNN backbones
+# (CNN weights shape mismatch). Train this run from scratch.
+
+model:
+  cnn_backbone: resnet
+  # You can scale this up/down based on GPU memory.
+  resnet_base_channels: 64
+  resnet_layers: [2, 2, 2]
+
+train:
+  ckpt_dir: checkpoints/resnet_tps
+  log_dir: logs/tensorboard_resnet_tps
+

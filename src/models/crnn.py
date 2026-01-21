@@ -16,6 +16,12 @@ class CRNNConfig:
     num_channels: int = 1
     num_classes: int = 38  # includes blank at 0
     cnn_out_channels: int = 256
+    # Visual backbone (CNN). "simple" is the original CRNN CNN; "resnet" is a stronger ResNet-style backbone.
+    cnn_backbone: str = "simple"  # simple|resnet
+    resnet_base_channels: int = 64
+    # ResNet blocks per stage (like ResNet-18: [2,2,2]).
+    # NOTE: This is a small OCR-tailored backbone; we keep width downsample factor at 4.
+    resnet_layers: tuple[int, int, int] = (2, 2, 2)
     rnn_hidden: int = 256
     rnn_layers: int = 2
     rnn_type: str = "lstm"  # lstm|gru
@@ -31,6 +37,88 @@ class CRNNConfig:
     tps_margin_x: float = 0.05
     tps_margin_y: float = 0.05
     tps_localization_channels: int = 32
+
+
+class _ResBlock(nn.Module):
+    def __init__(self, in_ch: int, out_ch: int):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_ch, out_ch, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(out_ch)
+        self.conv2 = nn.Conv2d(out_ch, out_ch, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(out_ch)
+        self.act = nn.ReLU(inplace=True)
+        self.proj = None
+        if in_ch != out_ch:
+            self.proj = nn.Sequential(
+                nn.Conv2d(in_ch, out_ch, kernel_size=1, stride=1, padding=0, bias=False),
+                nn.BatchNorm2d(out_ch),
+            )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        identity = x
+        out = self.act(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        if self.proj is not None:
+            identity = self.proj(identity)
+        out = self.act(out + identity)
+        return out
+
+
+class _ResNetOCRBackbone(nn.Module):
+    """
+    A small ResNet-style backbone tuned for CRNN:
+    - Keeps the CRNN time axis over width.
+    - Width downsample factor is fixed at 4 (via two 2x2 pools).
+    - Collapses height to 1 via adaptive pooling at the end.
+    """
+
+    def __init__(self, in_channels: int, out_channels: int, base_channels: int, layers: tuple[int, int, int]):
+        super().__init__()
+        c1 = int(base_channels)
+        c2 = int(base_channels * 2)
+        c3 = int(base_channels * 4)
+
+        self.stem = nn.Sequential(
+            nn.Conv2d(in_channels, c1, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(c1),
+            nn.ReLU(inplace=True),
+        )
+
+        self.stage1 = self._make_stage(c1, c1, layers[0])
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)  # H/2, W/2
+
+        self.stage2 = self._make_stage(c1, c2, layers[1])
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)  # H/4, W/4
+
+        self.stage3 = self._make_stage(c2, c3, layers[2])
+
+        # Project to the CRNN feature dimension expected by the RNN.
+        self.proj = nn.Sequential(
+            nn.Conv2d(c3, out_channels, kernel_size=1, stride=1, padding=0, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+        )
+
+    @staticmethod
+    def _make_stage(in_ch: int, out_ch: int, num_blocks: int) -> nn.Sequential:
+        blocks: list[nn.Module] = []
+        blocks.append(_ResBlock(in_ch, out_ch))
+        for _ in range(max(0, int(num_blocks) - 1)):
+            blocks.append(_ResBlock(out_ch, out_ch))
+        return nn.Sequential(*blocks)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.stem(x)
+        x = self.stage1(x)
+        x = self.pool1(x)
+        x = self.stage2(x)
+        x = self.pool2(x)
+        x = self.stage3(x)
+        x = self.proj(x)
+        # Collapse height to 1 while keeping width (time axis) unchanged.
+        if x.size(2) != 1:
+            x = F.adaptive_avg_pool2d(x, output_size=(1, x.size(3)))
+        return x  # [B,C,1,W/4]
 
 
 class _STNRectifier(nn.Module):
@@ -93,11 +181,6 @@ class CRNN(nn.Module):
         super().__init__()
         self.cfg = cfg
 
-        if cfg.img_h != 32:
-            # The CNN pooling stack below assumes H=32 for exact height squeezing.
-            # You can change img_h but you must adjust the pooling.
-            raise ValueError("CRNN currently expects img_h=32 for the default CNN stack.")
-
         self.stn: nn.Module | None = None
         self.tps: nn.Module | None = None
         if bool(cfg.tps_enabled):
@@ -115,23 +198,37 @@ class CRNN(nn.Module):
         elif bool(cfg.stn_enabled):
             self.stn = _STNRectifier(cfg.num_channels, int(cfg.stn_localization_channels))
 
-        self.cnn = nn.Sequential(
-            # [B,1,32,W]
-            nn.Conv2d(cfg.num_channels, 64, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),  # [B,64,16,W/2]
+        backbone = str(getattr(cfg, "cnn_backbone", "simple")).lower()
+        if backbone == "simple":
+            if cfg.img_h != 32:
+                # The original pooling stack below assumes H=32 for exact height squeezing.
+                raise ValueError("CRNN expects img_h=32 when model.cnn_backbone=simple.")
+            self.cnn = nn.Sequential(
+                # [B,1,32,W]
+                nn.Conv2d(cfg.num_channels, 64, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace=True),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # [B,64,16,W/2]
 
-            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),  # [B,128,8,W/4]
+                nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace=True),
+                nn.MaxPool2d(kernel_size=2, stride=2),  # [B,128,8,W/4]
 
-            nn.Conv2d(128, cfg.cnn_out_channels, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=True),
-            # Reduce height only: 8 -> 2
-            nn.MaxPool2d(kernel_size=(4, 1), stride=(4, 1)),  # [B,C,2,W/4]
-            # Reduce height only: 2 -> 1
-            nn.MaxPool2d(kernel_size=(2, 1), stride=(2, 1)),  # [B,C,1,W/4]
-        )
+                nn.Conv2d(128, cfg.cnn_out_channels, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace=True),
+                # Reduce height only: 8 -> 2
+                nn.MaxPool2d(kernel_size=(4, 1), stride=(4, 1)),  # [B,C,2,W/4]
+                # Reduce height only: 2 -> 1
+                nn.MaxPool2d(kernel_size=(2, 1), stride=(2, 1)),  # [B,C,1,W/4]
+            )
+        elif backbone == "resnet":
+            self.cnn = _ResNetOCRBackbone(
+                in_channels=int(cfg.num_channels),
+                out_channels=int(cfg.cnn_out_channels),
+                base_channels=int(getattr(cfg, "resnet_base_channels", 64)),
+                layers=tuple(getattr(cfg, "resnet_layers", (2, 2, 2))),
+            )
+        else:
+            raise ValueError(f"Unknown cnn_backbone={cfg.cnn_backbone}. Use simple|resnet.")
 
         rnn_in = cfg.cnn_out_channels
         rnn_out = cfg.rnn_hidden

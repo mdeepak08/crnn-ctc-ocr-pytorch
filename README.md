@@ -242,9 +242,17 @@ Greedy decoding only:
 | IIIT-5K | test | greedy | 0.0921 | 0.7680 |
 | SVT | test | greedy | 0.1307 | 0.6878 |
 
+### After upgrading CNN backbone to ResNet-style (TPS + mixed training)
+Greedy decoding only:
+
+| Dataset | Split | Decoder | CER ↓ | Word Acc ↑ |
+|---|---|---|---:|---:|
+| IIIT-5K | test | greedy | 0.0574 | 0.8223 |
+| SVT | test | greedy | 0.0727 | 0.8006 |
+
 ## Notes / next upgrades
 - To enable train-time augmentations, set `augment.enabled: true` in your config (validation/test are always run without augmentation).
-- Add augmentation (blur, perspective, noise) and stronger CNN backbones
+- Stronger CNN backbone: set `model.cnn_backbone: resnet` (see `configs/finetune_iiit5k_resnet.yaml`)
 - Add an LM-aware decoding (beam + char/word LM)
 - Replace BiLSTM with a Transformer encoder
 

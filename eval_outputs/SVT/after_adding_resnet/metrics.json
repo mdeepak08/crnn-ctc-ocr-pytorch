@@ -1,0 +1,8 @@
+{
+  "cer": 0.07270811380400422,
+  "word_acc": 0.8006182380216383,
+  "decoder": "greedy",
+  "num_samples": 647,
+  "dataset_csv": "data/processed/svt.csv",
+  "ckpt": "checkpoints/resnet_tps/best_by_cer.pt"
+}
